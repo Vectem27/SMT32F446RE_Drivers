@@ -2,6 +2,7 @@
 "./Core/Src/ili9341_driver.o"
 "./Core/Src/lcd_driver.o"
 "./Core/Src/main.o"
+"./Core/Src/num_keyboard_driver.o"
 "./Core/Src/project.o"
 "./Core/Src/sd_spi_driver.o"
 "./Core/Src/spi.o"

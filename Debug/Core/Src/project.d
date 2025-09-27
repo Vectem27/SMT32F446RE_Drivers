@@ -28,7 +28,7 @@ Core/Src/project.o: ../Core/Src/project.c ../Core/Inc/project.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
  ../Core/Inc/main.h ../Core/Inc/spi.h ../Core/Inc/main.h \
  ../Core/Inc/ili9341_driver.h ../Core/Inc/lcd_driver.h \
- ../Core/Inc/sd_spi_driver.h
+ ../Core/Inc/sd_spi_driver.h ../Core/Inc/num_keyboard_driver.h
 ../Core/Inc/project.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
@@ -63,3 +63,4 @@ Core/Src/project.o: ../Core/Src/project.c ../Core/Inc/project.h \
 ../Core/Inc/ili9341_driver.h:
 ../Core/Inc/lcd_driver.h:
 ../Core/Inc/sd_spi_driver.h:
+../Core/Inc/num_keyboard_driver.h:

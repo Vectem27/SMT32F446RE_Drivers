@@ -216,8 +216,7 @@ static SD_Error SD_SendCmd(SD_SPI_Handle *sd, uint8_t cmd, uint32_t arg, uint8_t
     SD_WriteByte(sd, (uint8_t) (arg >> 16)); /*!< byte 3 */
     SD_WriteByte(sd, (uint8_t) (arg >> 8)); /*!< byte 4 */
     SD_WriteByte(sd, (uint8_t) arg); /*!< byte 5 */
-    SD_WriteByte(sd, crc); /*!< byte 6: CRC */
-
+    SD_WriteByte(sd, crc | 0x01); /*!< byte 6: CRC */
 
     /* a byte received immediately after CMD12 should be discarded... */
     if (cmd == SD_CMD_STOP_TRANSMISSION)
@@ -243,18 +242,6 @@ static void SD_GetResponse4b(SD_SPI_Handle *sd, uint8_t *pres)
     pres[2] = SD_ReadByte(sd);
     pres[1] = SD_ReadByte(sd);
     pres[0] = SD_ReadByte(sd);
-}
-
-/**
- * @brief  Set SD Card sector size to SD_CMD_SET_BLOCKLEN (512 bytes)
- * @param  New sector size
- * @retval The SD Response:
- *         - SD_RESPONSE_FAILURE: Sequence failed
- *         - SD_RESPONSE_NO_ERROR: Sequence succeed
- */
-static SD_Error SD_FixSectorSize(SD_SPI_Handle *sd, uint16_t ssize)
-{
-    return SD_SendCmd(sd, SD_CMD_SET_BLOCKLEN, (uint32_t) ssize, 0xFF);
 }
 
 /**
@@ -332,140 +319,6 @@ static SD_Error SD_WaitBytesErased(SD_SPI_Handle *sd)
     }
     printf(" [[ ERASE delay was not enough ]] ");
     return SD_RESPONSE_FAILURE;
-}
-
-
-
-/**
- * @brief  Put SD in Idle state.
- * @param  None
- * @retval The SD Response:
- *         - SD_RESPONSE_FAILURE: Sequence failed
- *         - SD_RESPONSE_NO_ERROR: Sequence succeed
- */
-static SD_Error SD_GoIdleState(SD_SPI_Handle *sd)
-{
-    uint32_t res = 0;
-    uint32_t i;
-    uint8_t state;
-
-    /* --- put SD card in SPI mode */
-    SD_Bus_Hold(sd);
-
-    i = SD_NUM_TRIES; /* reset try count... */
-    do
-    { /* loop until In Idle State Response (in R1 format) confirmation */
-        state = SD_SendCmd(sd, SD_CMD_GO_IDLE_STATE, 0x00000000, 0x95); /* valid CRC is mandatory here */
-    } while (state != SD_IN_IDLE_STATE && i-- > 0);
-    /* still no Idle State Response => return response failure */
-    if (state != SD_IN_IDLE_STATE)
-        return SD_RESPONSE_FAILURE;
-
-    /* --- SD card is now in idle state and in SPI mode, activate it and get its type */
-    sd->card_type = SD_Card_SDSC_v2;
-
-
-    /* --- try to send CMD8 to offer voltage 2.7-3.6V with check pattern 0xAA */
-    i = SD_NUM_TRIES; /* reset try count... */
-    do
-    {
-        state = SD_SendCmd(sd, SD_CMD_SEND_IF_COND, 0x000001AA, 0x87); /* valid CRC is mandatory here */
-        if ((state & SD_ILLEGAL_COMMAND) != 0)
-        { /* SD card doesn't accept CMD8 => it's SDSC or MMC card... */
-            sd->card_type = SD_Card_SDSC_v1;
-            break;
-        }
-        else/* SD card accepts CMD8 => it's SDHC or SDXC card... */
-        { /* get R7 response and verify pattern for sanity check... */
-            SD_GetResponse4b(sd, (uint8_t*) &res);
-            if ((res & 0x0000FFFF) == 0x000001AA)
-                break; /* check pattern is OK, card accepted offered voltage... */
-            /* else specification recommends to retry CMD8 again */
-        }
-    } while (i-- > 0);
-    if (i == 0)
-        return SD_RESPONSE_FAILURE; /* error occurred... */
-
-
-    /* --- activate card initialization sequence... */
-    /* CMD55(0) -> ACMD41(0) -> ... */
-    i = SD_NUM_TRIES_INIT; /* reset try count... */
-    do
-    {
-        state = SD_SendCmd(sd, SD_CMD_SEND_APP, 0x00000000, 0);
-        if (state != SD_IN_IDLE_STATE)
-        { /* error occurred => last chance is to try it as a legacy MMC card */
-            sd->card_type = SD_Card_MMC;
-            break;
-        }
-
-
-        if (sd->card_type == SD_Card_SDSC_v1) /* HCS bit (0 here) is ignored by SDSC card */
-            state = SD_SendCmd(sd, SD_CMD_ACTIVATE_INIT, 0x00000000, 0);
-        else
-            state = SD_SendCmd(sd, SD_CMD_ACTIVATE_INIT, 0x40000000, 0);
-        /* loop while SD_IN_IDLE_STATE bit is set, meaning card is still performing initialization */
-    } while ((state & SD_IN_IDLE_STATE) != 0x00 && --i > 0);
-    /* it might be legacy MMC card... */
-    if (sd->card_type == SD_Card_SDSC_v1 && (state & SD_IN_IDLE_STATE) != 0x00)
-        sd->card_type = SD_Card_MMC;
-    else if ((state & SD_IN_IDLE_STATE) != 0x00)
-        return 0x90;
-
-    state = SD_WaitReady(sd); /* make sure card is ready before we go further... */
-
-    if (sd->card_type == SD_Card_MMC) /* legacy MMC card is initialized with CMD1... */
-    { /* -> CMD1(0) -> ... */
-        i = SD_NUM_TRIES_INIT; /* reset try count... */
-        do
-        {
-            state = SD_SendCmd(sd, SD_CMD_SEND_OP_COND, 0x00000000, 0xFF);
-        } while ((state & SD_IN_IDLE_STATE) != 0x00 && i-- > 0);
-        if (i == 0)
-            return SD_RESPONSE_FAILURE; /* error occurred... */
-    }
-    else if (sd->card_type == SD_Card_SDSC_v2) /* recent cards support byte-addressing, check it... */
-    { /* -> CMD58(0)... */
-        if (i == 0) /* first check if timeout occured during its initialization... */
-            return SD_RESPONSE_FAILURE; /* error occurred... */
-
-        /* request OCR register (send CMD58)... */
-        state = SD_SendCmd(sd, SD_CMD_READ_OCR, 0x00000000, 0xFF);
-        if (state == (SD_RESPONSE_NO_ERROR | 0x01) /*IDLE*/)
-        { /* get OCR register (R3 response) and check its CCS (bit 30) */
-            SD_GetResponse4b(sd, (uint8_t*) &res);
-            sd->card_type = (res & 0x40000000) ? SD_Card_SDHC : SD_Card_SDSC_v2;
-
-            if (!(res & 0x00FF8000))
-                return 0x80;
-        }
-    }
-    /* else cardType == SD_Card_SDSC_v1 */
-
-    state = SD_WaitReady(sd); /* make sure card is ready before we go further... */
-
-    /* print out detected SD card type... */
-    switch (sd->card_type)
-    {
-    case SD_Card_SDSC_v1:
-        printf("SDSC v1 (byte address)");
-        break;
-    case SD_Card_SDSC_v2:
-        printf("SDSC v2 (byte address)");
-        break;
-    case SD_Card_SDHC:
-        printf("SDHC (512-bytes sector address)");
-        break;
-    case SD_Card_MMC:
-        printf("MMC (byte address)");
-        break;
-    default:
-        printf("UNKNOWN");
-        break;
-    }
-    printf(" card initialized successfully\n");
-
-    return SD_RESPONSE_NO_ERROR;
 }
 
 /**
@@ -683,6 +536,116 @@ static SD_Error SD_GetSCRRegister(SD_SPI_Handle *sd, SD_SCR *SD_scr)
     return state;
 }
 
+/**
+ * @brief  Put SD in Idle state.
+ * @param  None
+ * @retval The SD Response:
+ *         - SD_RESPONSE_FAILURE: Sequence failed
+ *         - SD_RESPONSE_NO_ERROR: Sequence succeed
+ */
+static SD_Error SD_GoIdleState(SD_SPI_Handle *sd)
+{
+    uint32_t res = 0;
+    uint32_t i;
+    uint8_t state;
+
+    /* --- put SD card in SPI mode */
+    SD_Bus_Hold(sd);
+
+    /* Software reset */
+
+    state = SD_SendCmd(sd, 0, 0x00000000, 0x95); // valid CRC is mandatory here
+    if (state != SD_IN_IDLE_STATE)
+        return SD_RESPONSE_FAILURE;
+
+    /* */
+
+    state = SD_SendCmd(sd, 8, 0x000001AA, 0x87); // valid CRC is mandatory here
+
+    if (state == SD_IN_IDLE_STATE)
+    {
+        SD_GetResponse4b(sd, (uint8_t*) &res);
+
+        if (res != 0x01AA)
+            return SD_RESPONSE_FAILURE;
+
+        i = SD_NUM_TRIES_INIT;
+        do
+        {
+            state = SD_SendCmd(sd, 55, 0x00, 0xFF);
+
+            if (state == SD_IN_IDLE_STATE)
+            {
+
+                state = SD_SendCmd(sd, 41, 0x40000000, 0xFF);
+
+                SD_GetResponse4b(sd, (uint8_t*) &res);
+            }
+
+            if ((state & SD_IN_IDLE_STATE) != 0x00)
+                state = SD_SendCmd(sd, 1, 0x00, 0xFF);
+
+        } while ((state & SD_IN_IDLE_STATE) != 0x00 && --i > 0);
+
+        if ((state & SD_IN_IDLE_STATE) != 0x00)
+            return SD_RESPONSE_FAILURE;
+
+        /* Check OCR */
+
+        /* request OCR register (send CMD58)... */
+        state = SD_SendCmd(sd, SD_CMD_READ_OCR, 0x00000000, 0xFF);
+        if (state == SD_RESPONSE_NO_ERROR)
+        { /* get OCR register (R3 response) and check its CCS (bit 30) */
+            SD_GetResponse4b(sd, (uint8_t*) &res);
+            sd->card_type = (res & 0x40000000) ? SD_Card_SDHC : SD_Card_SDSC_v2;
+        }
+    }
+    else
+    {
+        sd->card_type = SD_Card_SDSC_v1;
+
+        i = SD_NUM_TRIES_INIT;
+        do
+        {
+            state = SD_SendCmd(sd, 55, 0x00, 0xFF);
+
+            if (state == SD_IN_IDLE_STATE)
+            {
+
+                state = SD_SendCmd(sd, 41, 0x00000000, 0xFF);
+
+                SD_GetResponse4b(sd, (uint8_t*) &res);
+            }
+
+            if ((state & SD_IN_IDLE_STATE) == 0x00)
+            {
+                state = SD_SendCmd(sd, 1, 0x00, 0xFF);
+                sd->card_type = SD_Card_MMC;
+            }
+
+        } while ((state & SD_IN_IDLE_STATE) != 0x00 && --i > 0);
+
+        if ((state & SD_IN_IDLE_STATE) != 0x00)
+            return SD_RESPONSE_FAILURE;
+    }
+
+    state = SD_WaitReady(sd);
+
+    return SD_RESPONSE_NO_ERROR;
+}
+
+/**
+ * @brief  Set SD Card sector size to SD_CMD_SET_BLOCKLEN (512 bytes)
+ * @param  New sector size
+ * @retval The SD Response:
+ *         - SD_RESPONSE_FAILURE: Sequence failed
+ *         - SD_RESPONSE_NO_ERROR: Sequence succeed
+ */
+static SD_Error SD_FixSectorSize(SD_SPI_Handle *sd, uint16_t ssize)
+{
+    return SD_SendCmd(sd, SD_CMD_SET_BLOCKLEN, (uint32_t) ssize, 0xFF);
+}
+
 SD_Error SD_Init(SD_SPI_Handle *sd)
 {
     SD_Error state;
@@ -732,6 +695,7 @@ SD_Error SD_Init(SD_SPI_Handle *sd)
     SD_Bus_Release(sd);
 
     hspi->Init = spi_init_backup;
+    hspi->Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
     if (HAL_SPI_Init(hspi) != HAL_OK)
     {
         // TODO: Handle error
@@ -744,8 +708,6 @@ SD_Error SD_SectorRead(SD_SPI_Handle *sd, uint32_t readAddr, uint8_t *pBuffer)
 {
 
     SD_Error state;
-
-    printf("--> reading sector %lu ...", readAddr);
 
     /* non High Capacity cards use byte-oriented addresses */
     if (sd->card_type != SD_Card_SDHC)
@@ -764,10 +726,49 @@ SD_Error SD_SectorRead(SD_SPI_Handle *sd, uint32_t readAddr, uint8_t *pBuffer)
 
     SD_Bus_Release(sd); /* release SPI bus... */
 
+    return state;
+}
+
+SD_Error SD_SectorWrite(SD_SPI_Handle *sd, uint32_t writeAddr, const uint8_t *pBuffer)
+{
+    SD_Error state;
+    SD_DataResponse res;
+    uint16_t BlockSize = SD_BLOCK_SIZE;
+
+    /* non High Capacity cards use byte-oriented addresses */
+    if (sd->card_type != SD_Card_SDHC)
+        writeAddr <<= 9;
+
+    SD_Bus_Hold(sd); /* hold SPI bus... */
+
+    state = SD_WaitReady(sd); /* make sure card is ready before we go further... */
+
+    /* send CMD24 (SD_CMD_WRITE_SINGLE_BLOCK) to write single block */
+    state = SD_SendCmd(sd, SD_CMD_WRITE_SINGLE_BLOCK, writeAddr, 0xFF);
     if (state == SD_RESPONSE_NO_ERROR)
-        printf("OK\n");
-    else
-        printf("KO(%d)\n", state);
+    { /* wait at least 8 clock cycles (send >=1 0xFF bytes) before transmission starts */
+        SD_ReadByte(sd);
+        SD_ReadByte(sd);
+        SD_ReadByte(sd);
+        /* send data token to signify the start of data transmission... */
+        SD_WriteByte(sd, SD_DATA_SINGLE_BLOCK_WRITE_START); /* 0xFE */
+        /* send data... */
+        while (--BlockSize > 0)
+            SD_WriteByte(sd, *pBuffer++);
+        /* put 2 CRC bytes (not really needed by us, but required by SD) */
+        SD_ReadByte(sd);
+        SD_ReadByte(sd);
+        /* check data response... */
+        res = (SD_DataResponse) (SD_ReadByte(sd) & SD_RESPONSE_MASK); /* mask unused bits */
+        if ((res & SD_RESPONSE_ACCEPTED) != 0)
+        { /* card is now processing data and goes to BUSY mode, wait until it finishes... */
+            state = SD_WaitBytesWritten(sd); /* make sure card is ready before we go further... */
+        }
+        else
+            state = SD_RESPONSE_FAILURE;
+    }
+
+    SD_Bus_Release(sd); /* release SPI bus... */
 
     return state;
 }

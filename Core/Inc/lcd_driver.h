@@ -102,7 +102,7 @@ extern const char xchar[][24];
 #define ROW9  ROW1 + 160
 #define ROW10 ROW1 + 180
 #define ROW11 ROW1 + 200
-
+#define ROW12 ROW1 + 220
 //STRING FUNCTIONS
 int int2asc(long, int, char*, int);
 

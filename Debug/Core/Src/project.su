@@ -1,2 +1,4 @@
-../Core/Src/project.c:24:6:Init	584	static
-../Core/Src/project.c:83:6:Loop	16	static
+../Core/Src/project.c:33:6:Init	40	static
+../Core/Src/project.c:117:6:PrintAtSeek	48	static
+../Core/Src/project.c:133:6:Loop	24	static
+../Core/Src/project.c:163:6:MemTest	56	static

@@ -59,12 +59,26 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define B1_Pin GPIO_PIN_13
 #define B1_GPIO_Port GPIOC
+#define NKB_IN_COL_A_Pin GPIO_PIN_0
+#define NKB_IN_COL_A_GPIO_Port GPIOC
+#define NKB_IN_COL_B_Pin GPIO_PIN_1
+#define NKB_IN_COL_B_GPIO_Port GPIOC
+#define NKB_OUT_ROW_4_Pin GPIO_PIN_2
+#define NKB_OUT_ROW_4_GPIO_Port GPIOC
+#define NKB_OUT_ROW_3_Pin GPIO_PIN_0
+#define NKB_OUT_ROW_3_GPIO_Port GPIOA
+#define NKB_OUT_ROW_2_Pin GPIO_PIN_1
+#define NKB_OUT_ROW_2_GPIO_Port GPIOA
 #define USART_TX_Pin GPIO_PIN_2
 #define USART_TX_GPIO_Port GPIOA
 #define USART_RX_Pin GPIO_PIN_3
 #define USART_RX_GPIO_Port GPIOA
+#define NKB_OUT_ROW_1_Pin GPIO_PIN_4
+#define NKB_OUT_ROW_1_GPIO_Port GPIOA
 #define SD_CS_Pin GPIO_PIN_4
 #define SD_CS_GPIO_Port GPIOC
+#define NKB_IN_COL_C_Pin GPIO_PIN_0
+#define NKB_IN_COL_C_GPIO_Port GPIOB
 #define LCD_RESET_Pin GPIO_PIN_7
 #define LCD_RESET_GPIO_Port GPIOC
 #define LCD_DC_Pin GPIO_PIN_9
