@@ -28,6 +28,8 @@ NKB_Handle hnkb;
 uint8_t MAX_LINE_CHAR;
 uint8_t MAX_ROW_CHAR;
 
+uint32_t mem_counter = 0x4000;
+
 void MemTest(uint32_t Addr);
 
 void Init(void)
@@ -49,27 +51,41 @@ void Init(void)
         ili9341_init(&hlcd);
 
         hlcd.Clear(&hlcd);
-        hlcd.PrintString(&hlcd, 0, 20 * row++, "Hello World!", 1, WHITE, hlcd.Init.bg_color);
 
         MAX_LINE_CHAR = hlcd.width / FONTWIDTH;
         MAX_ROW_CHAR = hlcd.height / FONTHEIGHT;
     }
 
     /* Sd card init */
-    /*{
-     hsd.init.hspi = &hspi1;
-     hsd.init.CS_Pin = SD_CS_Pin;
-     hsd.init.CS_Port = SD_CS_GPIO_Port;
+    {
+        hsd.init.hspi = &hspi1;
+        hsd.init.CS_Pin = SD_CS_Pin;
+        hsd.init.CS_Port = SD_CS_GPIO_Port;
 
-     SD_Error res = SD_Init(&hsd);
-     if (res != SD_RESPONSE_NO_ERROR)
-     {
-     char str[32];
-     sprintf(str, "Failed to init SD : 0x%x", res);
+        SD_Error res = SD_Init(&hsd);
+        if (res != SD_RESPONSE_NO_ERROR)
+        {
+            char str[32];
+            sprintf(str, "Failed to init SD : 0x%x", res);
 
-     hlcd.PrintString(&hlcd, 0, 20 * row++, str, 1, WHITE, hlcd.Init.bg_color);
-     }
-     }*/
+            hlcd.PrintString(&hlcd, 0, 20 * row++, str, 1, WHITE, hlcd.Init.bg_color);
+        }
+
+        SD_SCR sd_test_scr;
+        SD_GetSCRRegister(&hsd, &sd_test_scr);
+
+        if (sd_test_scr.Security != 0)
+            hlcd.PrintString(&hlcd, 0, row++, "SD might be protected\n", 1, WHITE, hlcd.Init.bg_color);
+
+        SD_CSD sd_test_csd;
+        SD_GetCSDRegister(&hsd, &sd_test_csd);
+
+        if (sd_test_csd.PermWrProtect)
+            hlcd.PrintString(&hlcd, 0, row++, "SD is write perm protected", 1, WHITE, hlcd.Init.bg_color);
+
+        if (sd_test_csd.TempWrProtect)
+                    hlcd.PrintString(&hlcd, 0, row++, "SD is write temp protected", 1, WHITE, hlcd.Init.bg_color);
+    }
 
     /* Num keyboard init */
     {
@@ -95,12 +111,12 @@ void Init(void)
     }
 
     hlcd.PrintString(&hlcd, 0, ROW12, "Init finished", 1, WHITE, hlcd.Init.bg_color);
-    hlcd.Clear(&hlcd);
+    //hlcd.Clear(&hlcd);
+
 }
 
 static uint16_t FPS;
 uint8_t bDoOnce = 1;
-uint32_t counter = 10241;
 
 struct KeyChar
 {
@@ -136,28 +152,46 @@ void Loop(uint32_t ticks)
 
     NKB_Update(&hnkb);
 
-    for (int i = 0; i < NKB_NUM_KEYS; ++i)
+    if (NKB_TryConsumeOnKeyPressed(&hnkb, NKB_KEY_0))
     {
-        if (NKB_TryConsumeOnKeyPressed(&hnkb, keyChars[i].key))
-        {
-            if (i == 9)
-            {
-                if (seek > 0)
-                {
-                    --seek;
-                    PrintAtSeek(' ');
-                    --seek;
-                }
-            }
-            else if (i == 11)
-            {
-                seek = 0;
-                hlcd.Clear(&hlcd);
-            }
-            else
-                PrintAtSeek(keyChars[i].c);
-        }
+        hlcd.PrintString(&hlcd, 0, 0, "                            ", 1, WHITE, hlcd.Init.bg_color);
+        hlcd.PrintString(&hlcd, 0, 20, "                            ", 1, WHITE, hlcd.Init.bg_color);
+        mem_counter += 0x4000;
+        MemTest(mem_counter);
     }
+
+    if (NKB_TryConsumeOnKeyPressed(&hnkb, NKB_KEY_HASH))
+    {
+        mem_counter = 256;
+    }
+
+    if (NKB_TryConsumeOnKeyPressed(&hnkb, NKB_KEY_ASTERISK))
+    {
+        mem_counter++;
+    }
+
+    /*for (int i = 0; i < NKB_NUM_KEYS; ++i)
+     {
+     if (NKB_TryConsumeOnKeyPressed(&hnkb, keyChars[i].key))
+     {
+     if (i == 9)
+     {
+     if (seek > 0)
+     {
+     --seek;
+     PrintAtSeek(' ');
+     --seek;
+     }
+     }
+     else if (i == 11)
+     {
+     seek = 0;
+     hlcd.Clear(&hlcd);
+     }
+     else
+     PrintAtSeek(keyChars[i].c);
+     }
+     }*/
 }
 
 void MemTest(uint32_t Addr)
