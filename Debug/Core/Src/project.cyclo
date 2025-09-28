@@ -1,4 +1,0 @@
-../Core/Src/project.c:33:6:Init	1
-../Core/Src/project.c:117:6:PrintAtSeek	2
-../Core/Src/project.c:133:6:Loop	6
-../Core/Src/project.c:163:6:MemTest	6
