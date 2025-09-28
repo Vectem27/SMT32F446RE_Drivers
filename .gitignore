@@ -1,9 +1,41 @@
-*.ld
-*.launch
-.cproject
-.mxproject
-.project
+# ------------------------------
+# Fichiers projet Eclipse / STM32CubeIDE
+# ------------------------------
+# Garde les fichiers de configuration
+# .project, .cproject, .mxproject, .settings/ ne sont pas ignorés
+# .ioc permet de conserver la configuration CubeMX
 
-.settings
-/Debug
+# ------------------------------
+# Dossiers de build / compilations
+# ------------------------------
+Debug/
+Release/
+Build/
+
+# ------------------------------
+# Fichiers objets / exécutables / binaires
+# ------------------------------
 *.o
+*.elf
+*.axf
+*.map
+*.bin
+*.hex
+*.lst
+*.d
+
+# ------------------------------
+# Fichiers temporaires / logs
+# ------------------------------
+*.log
+*.tmp
+*.bak
+*~
+*.swp
+*.swo
+
+# ------------------------------
+# Fichiers temporaires CubeMX
+# ------------------------------
+*.ioc.bak
+*.h.gch
