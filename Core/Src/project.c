@@ -84,7 +84,7 @@ void Init(void)
             hlcd.PrintString(&hlcd, 0, row++, "SD is write perm protected", 1, WHITE, hlcd.Init.bg_color);
 
         if (sd_test_csd.TempWrProtect)
-                    hlcd.PrintString(&hlcd, 0, row++, "SD is write temp protected", 1, WHITE, hlcd.Init.bg_color);
+            hlcd.PrintString(&hlcd, 0, row++, "SD is write temp protected", 1, WHITE, hlcd.Init.bg_color);
     }
 
     /* Num keyboard init */
@@ -146,6 +146,10 @@ void PrintAtSeek(char c)
 
 }
 
+static volatile uint32_t tick_flag = 0;
+
+uint32_t tim_count = 0;
+
 void Loop(uint32_t ticks)
 {
     //FPS = 60000 / ticks;
@@ -168,6 +172,14 @@ void Loop(uint32_t ticks)
     if (NKB_TryConsumeOnKeyPressed(&hnkb, NKB_KEY_ASTERISK))
     {
         mem_counter++;
+    }
+
+    if (tick_flag != 0)
+    {
+
+        tim_count += tick_flag;
+        hlcd.PrintString(&hlcd, 0, ROW5, "Timer interrupt", 1, MAROON1, hlcd.Init.bg_color);
+        hlcd.PrintNumber(&hlcd, 0, ROW6, tim_count, 0, 1, MAROON2, hlcd.Init.bg_color);
     }
 
     /*for (int i = 0; i < NKB_NUM_KEYS; ++i)
@@ -239,4 +251,9 @@ void MemTest(uint32_t Addr)
         sprintf(str, "Block : 0x%02x", Addr);
         hlcd.PrintString(&hlcd, 0, 20 * row++, (char*) str, 1, WHITE, hlcd.Init.bg_color);
     }
+}
+
+void TimerInterupt(void)
+{
+    tick_flag++;
 }

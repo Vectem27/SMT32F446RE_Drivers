@@ -14,4 +14,6 @@ void Init(void);
 
 void Loop(uint32_t delta_ms);
 
+void TimerInterupt(void);
+
 #endif // __PROJECT_H__
