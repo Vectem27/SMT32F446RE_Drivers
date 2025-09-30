@@ -264,66 +264,28 @@ typedef enum _SD_InitResult
 
 } SD_InitResult;
 
+
 /**
- * @brief  Initializes the SD Card
- * @param  None
- * @retval The SD Response:
- *         - SD_RESPONSE_FAILURE: Sequence failed
- *         - SD_RESPONSE_NO_ERROR: Sequence succeed
+ * @brief  Hold SPI bus for SD card
  */
+void SD_Bus_Hold(SD_SPI_Handle *sd);
+
+/**
+ * @brief  Release SPI bus used by SD card
+ */
+void SD_Bus_Release(SD_SPI_Handle *sd);
+
+
 SD_InitResult SD_Init(SD_SPI_Handle *sd);
 
-/**
- * @brief  Reads a sector of SD_BLOCK_SIZE bytes from the SD card
- * @param  pBuffer: pointer to the buffer that receives the data read from SD.
- * @param  readAddr: SD's internal address to read from (sector number)
- * @retval The SD Response:
- *         - SD_RESPONSE_FAILURE: Sequence failed
- *         - SD_RESPONSE_NO_ERROR: Sequence succeed
- */
 SD_Error SD_SectorRead(SD_SPI_Handle *sd, uint32_t readAddr, uint8_t *pBuffer);
 
-/**
- * @brief  Writes a sector of SD_BLOCK_SIZE bytes on the SD card
- * @param  pBuffer: pointer to the buffer with the data to be written on SD.
- * @param  writeAddr: address to write on.
- * @retval The SD Response:
- *         - SD_RESPONSE_FAILURE: Sequence failed
- *         - SD_RESPONSE_NO_ERROR: Sequence succeed
- */
 SD_Error SD_SectorWrite(SD_SPI_Handle *sd, uint32_t writeAddr, const uint8_t *pBuffer);
 
-/**
- * @brief  Read the CSD card register.
- *         Reading the contents of the CSD register in SPI mode is a simple
- *         read-block transaction.
- * @param  SD_csd: pointer on an SCD register structure
- * @retval The SD Response:
- *         - SD_RESPONSE_FAILURE: Sequence failed
- *         - SD_RESPONSE_NO_ERROR: Sequence succeed
- */
 SD_Error SD_GetCSDRegister(SD_SPI_Handle *sd, SD_CSD *SD_csd);
 
-/**
- * @brief  Read the CID card register.
- *         Reading the contents of the CID register in SPI mode is a simple
- *         read-block transaction.
- * @param  SD_cid: pointer on an CID register structure
- * @retval The SD Response:
- *         - SD_RESPONSE_FAILURE: Sequence failed
- *         - SD_RESPONSE_NO_ERROR: Sequence succeed
- */
 SD_Error SD_GetCIDRegister(SD_SPI_Handle *sd, SD_CID *SD_cid);
 
-/**
- * @brief  Read the SCR card register.
- *         Reading the contents of the SCR register in SPI mode is a simple
- *         read-block transaction.
- * @param  SD_scr: pointer on an SCR register structure
- * @retval The SD Response:
- *         - SD_RESPONSE_FAILURE: Sequence failed
- *         - SD_RESPONSE_NO_ERROR: Sequence succeed
- */
 SD_Error SD_GetSCRRegister(SD_SPI_Handle *sd, SD_SCR *SD_scr);
 
 #endif // __SD_DRIVER_H__

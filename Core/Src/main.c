@@ -98,6 +98,7 @@ int main(void)
   MX_SPI1_Init();
   MX_USART2_UART_Init();
   MX_TIM2_Init();
+  MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
     Init();
     HAL_TIM_Base_Start_IT(&htim2);

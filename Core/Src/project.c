@@ -30,12 +30,10 @@ uint8_t MAX_ROW_CHAR;
 
 uint32_t mem_counter = 0x4000;
 
-void MemTest(uint32_t Addr);
-
 void Init(void)
 {
 
-    uint8_t row = 0;
+    uint16_t row = 0;
 
     /* Lcd screen init */
     {
@@ -58,7 +56,7 @@ void Init(void)
 
     /* Sd card init */
     {
-        hsd.init.hspi = &hspi1;
+        hsd.init.hspi = &hspi2;
         hsd.init.CS_Pin = SD_CS_Pin;
         hsd.init.CS_Port = SD_CS_GPIO_Port;
 
@@ -71,20 +69,16 @@ void Init(void)
             hlcd.PrintString(&hlcd, 0, 20 * row++, str, 1, WHITE, hlcd.Init.bg_color);
         }
 
-        SD_SCR sd_test_scr;
-        SD_GetSCRRegister(&hsd, &sd_test_scr);
+        /*SD_CSD sd_test_csd;
+         SD_Bus_Hold(&hsd);
+         SD_GetCSDRegister(&hsd, &sd_test_csd);
+         SD_Bus_Release(&hsd);
 
-        if (sd_test_scr.Security != 0)
-            hlcd.PrintString(&hlcd, 0, row++, "SD might be protected\n", 1, WHITE, hlcd.Init.bg_color);
+         if (sd_test_csd.PermWrProtect)
+         hlcd.PrintString(&hlcd, 0, 20 * row++, "SD is write perm protected", 1, WHITE, hlcd.Init.bg_color);
 
-        SD_CSD sd_test_csd;
-        SD_GetCSDRegister(&hsd, &sd_test_csd);
-
-        if (sd_test_csd.PermWrProtect)
-            hlcd.PrintString(&hlcd, 0, row++, "SD is write perm protected", 1, WHITE, hlcd.Init.bg_color);
-
-        if (sd_test_csd.TempWrProtect)
-            hlcd.PrintString(&hlcd, 0, row++, "SD is write temp protected", 1, WHITE, hlcd.Init.bg_color);
+         if (sd_test_csd.TempWrProtect)
+         hlcd.PrintString(&hlcd, 0, 20 * row++, "SD is write temp protected", 1, WHITE, hlcd.Init.bg_color);*/
     }
 
     /* Num keyboard init */
@@ -110,9 +104,50 @@ void Init(void)
         NKB_Init(&hnkb);
     }
 
-    hlcd.PrintString(&hlcd, 0, ROW12, "Init finished", 1, WHITE, hlcd.Init.bg_color);
-    //hlcd.Clear(&hlcd);
+    /* Sd card check */
+    {
+        HAL_Delay(250);
+        uint8_t res;
 
+        /* Write */
+        for (int i = 0; i < 2; ++i)
+        {
+            uint8_t tx_buffer[512];
+            memset(tx_buffer, '\0', 512);
+            if (i == 0)
+                sprintf((char*) tx_buffer, "Hello world (Write 1) !");
+            else
+                sprintf((char*) tx_buffer, "Hello world (Write 2) !");
+
+            res = SD_SectorWrite(&hsd, 0x50, tx_buffer);
+            if (res != SD_RESPONSE_NO_ERROR)
+            {
+                char str[22];
+                sprintf(str, "Failed to write SD : 0x%x", res);
+                hlcd.PrintString(&hlcd, 0, 20 * row++, str, 1, WHITE, hlcd.Init.bg_color);
+            }
+
+            /* Read */
+            uint8_t rx_buffer[512];
+            memset(rx_buffer, '0', 512);
+            res = SD_SectorRead(&hsd, 0x50, rx_buffer);
+            if (res != SD_RESPONSE_NO_ERROR)
+            {
+                char str[22];
+                sprintf(str, "Failed to read SD : 0x%x", res);
+                hlcd.PrintString(&hlcd, 0, 20 * row++, str, 1, WHITE, hlcd.Init.bg_color);
+            }
+            else
+            {
+                rx_buffer[26] = '\0';
+                hlcd.PrintString(&hlcd, 0, 20 * row++, (char*) rx_buffer, 1, YELLOW, hlcd.Init.bg_color);
+            }
+        }
+    }
+
+    //hlcd.Clear(&hlcd);
+    hlcd.PrintString(&hlcd, 0, ROW12, "Init finished", 1, WHITE, hlcd.Init.bg_color);
+    //MemTest(0x400);
 }
 
 static uint16_t FPS;
@@ -156,28 +191,11 @@ void Loop(uint32_t ticks)
 
     NKB_Update(&hnkb);
 
-    if (NKB_TryConsumeOnKeyPressed(&hnkb, NKB_KEY_0))
-    {
-        hlcd.PrintString(&hlcd, 0, 0, "                            ", 1, WHITE, hlcd.Init.bg_color);
-        hlcd.PrintString(&hlcd, 0, 20, "                            ", 1, WHITE, hlcd.Init.bg_color);
-        mem_counter += 0x4000;
-        MemTest(mem_counter);
-    }
-
-    if (NKB_TryConsumeOnKeyPressed(&hnkb, NKB_KEY_HASH))
-    {
-        mem_counter = 256;
-    }
-
-    if (NKB_TryConsumeOnKeyPressed(&hnkb, NKB_KEY_ASTERISK))
-    {
-        mem_counter++;
-    }
-
-    if (tick_flag != 0)
+    if (tick_flag >= 100)
     {
 
         tim_count += tick_flag;
+        tick_flag = 0;
         hlcd.PrintString(&hlcd, 0, ROW5, "Timer interrupt", 1, MAROON1, hlcd.Init.bg_color);
         hlcd.PrintNumber(&hlcd, 0, ROW6, tim_count, 0, 1, MAROON2, hlcd.Init.bg_color);
     }
@@ -204,53 +222,6 @@ void Loop(uint32_t ticks)
      PrintAtSeek(keyChars[i].c);
      }
      }*/
-}
-
-void MemTest(uint32_t Addr)
-{
-    uint8_t row = 0;
-    SD_Error res;
-
-    static char str[32];
-
-    static uint8_t buffer[512];
-
-    static uint8_t new_buff[20];
-
-    memset(buffer, 0x09, 512);
-    res = SD_SectorWrite(&hsd, Addr, buffer);
-    if (res != SD_RESPONSE_NO_ERROR)
-    {
-        sprintf(str, "Failed to write SD : 0x%x", res);
-        hlcd.PrintString(&hlcd, 0, 20 * row++, str, 1, WHITE, hlcd.Init.bg_color);
-    }
-
-    memset(buffer, 0, 512);
-    res = SD_SectorRead(&hsd, Addr, buffer);
-    if (res != SD_RESPONSE_NO_ERROR)
-    {
-
-        sprintf(str, "Failed to read SD : 0x%x", res);
-        hlcd.PrintString(&hlcd, 0, 20 * row++, str, 1, WHITE, hlcd.Init.bg_color);
-    }
-    else
-    {
-        int cur = 0;
-        memset(new_buff, ' ', 20);
-        for (int i = 0; i < 512; ++i)
-        {
-            if (buffer[i] != 0)
-            {
-                new_buff[cur] = buffer[i];
-                if (++cur == 20)
-                    break;
-            }
-
-        }
-        hlcd.PrintString(&hlcd, 0, 20 * row++, (char*) new_buff, 1, YELLOW, hlcd.Init.bg_color);
-        sprintf(str, "Block : 0x%02x", Addr);
-        hlcd.PrintString(&hlcd, 0, 20 * row++, (char*) str, 1, WHITE, hlcd.Init.bg_color);
-    }
 }
 
 void TimerInterupt(void)

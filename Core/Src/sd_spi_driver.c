@@ -33,7 +33,6 @@ typedef enum _SD_DataError
     SD_DATA_TOKEN_CARD_LOCKED = 0x10,
 } SD_DataError;
 
-
 /**
  * @brief  Commands: CMDxx = CMD-number | 0x40
  */
@@ -63,27 +62,31 @@ typedef enum _SD_DataError
  */
 typedef enum _SD_CMD
 {
-    SD_CMD_GO_IDLE_STATE = 0, /*!< CMD0  = 0x40, ARG=0x00000000, CRC=0x95 */
-    SD_CMD_SEND_OP_COND = 1, /*!< CMD1  = 0x41 */
-    SD_CMD_SEND_IF_COND = 8, /*!< CMD8  = 0x48, ARG=0x000001AA, CRC=0x87 */
-    SD_CMD_SEND_APP = 55, /*!< CMD55 = 0x77, ARG=0x00000000, CRC=0x65 */
-    SD_CMD_ACTIVATE_INIT = 41, /*!< ACMD41= 0x69, ARG=0x40000000, CRC=0x77 */
-    SD_CMD_READ_OCR = 58, /*!< CMD58 = 0x7A, ARG=0x00000000, CRC=0xFF */
-    SD_CMD_SEND_CSD = 9, /*!< CMD9  = 0x49 */
-    SD_CMD_SEND_CID = 10, /*!< CMD10 = 0x4A */
-    SD_CMD_SEND_SCR = 51, /*!< ACMD51= 0x73 */
-    SD_CMD_STATUS = 13, /*!< ACMD13= 0x4D */
-    SD_CMD_STOP_TRANSMISSION = 12, /*!< CMD12 = 0x4C */
-    SD_CMD_SET_BLOCKLEN = 16, /*!< CMD16 = 0x50 */
-    SD_CMD_READ_SINGLE_BLOCK = 17, /*!< CMD17 = 0x51 */
-    SD_CMD_READ_MULT_BLOCK = 18, /*!< CMD18 = 0x52 */
-    SD_CMD_SET_BLOCK_COUNT = 23, /*!< CMD23 = 0x57 */
-    SD_CMD_WRITE_SINGLE_BLOCK = 24, /*!< CMD24 = 0x58 */
-    SD_CMD_WRITE_MULT_BLOCK = 25, /*!< CMD25 = 0x59 */
-    SD_CMD_ERASE_BLOCK_START = 32, /*!< CMD32 = 0x60 */
-    SD_CMD_ERASE_BLOCK_END = 33, /*!< CMD33 = 0x61 */
-    SD_CMD_ERASE = 38 /*!< CMD38 = 0x66 */
+    SD_CMD_GO_IDLE_STATE = 0,     // CMD0  = 0x40, ARG=0x00000000, CRC=0x95
+    SD_CMD_SEND_OP_COND = 1,          // CMD1  = 0x41
+    SD_CMD_SEND_IF_COND = 8,          // CMD8  = 0x48, ARG=0x000001AA, CRC=0x87
+    SD_CMD_SEND_CSD = 9,          // CMD9  = 0x49
+    SD_CMD_SEND_CID = 10,     // CMD10 = 0x4A
+    SD_CMD_STOP_TRANSMISSION = 12,     // CMD12 = 0x4C
+    SD_CMD_SET_BLOCKLEN = 16,     // CMD16 = 0x50
+    SD_CMD_READ_SINGLE_BLOCK = 17,     // CMD17 = 0x51
+    SD_CMD_READ_MULT_BLOCK = 18,     // CMD18 = 0x52
+    SD_CMD_SET_BLOCK_COUNT = 23,     // CMD23 = 0x57
+    SD_CMD_WRITE_SINGLE_BLOCK = 24,     // CMD24 = 0x58
+    SD_CMD_WRITE_MULT_BLOCK = 25,     // CMD25 = 0x59
+    SD_CMD_ERASE_BLOCK_START = 32,     // CMD32 = 0x60
+    SD_CMD_ERASE_BLOCK_END = 33,     // CMD33 = 0x61
+    SD_CMD_ERASE = 38,     // CMD38 = 0x66
+    SD_CMD_SEND_APP = 55,     // CMD55 = 0x77, ARG=0x00000000, CRC=0x65
+    SD_CMD_READ_OCR = 58,     // CMD58 = 0x7A, ARG=0x00000000, CRC=0xFF
 } SD_CMD;
+
+typedef enum _SD_ACMD
+{
+    SD_ACMD_STATUS = 13,     // ACMD13= 0x4D
+    SD_ACMD_ACTIVATE_INIT = 41,     // ACMD41= 0x69, ARG=0x40000000, CRC=0x77
+    SD_ACMD_SEND_SCR = 51,     // ACMD51= 0x73
+} SD_ACMD;
 
 /**
  * @brief  Dummy byte
@@ -179,22 +182,12 @@ uint8_t SD_ReadByte(SD_SPI_Handle *sd)
     return data;
 }
 
-/**
- * @brief  Hold SPI bus for SD card
- * @param  None
- * @retval None
- */
-static void SD_Bus_Hold(SD_SPI_Handle *sd)
+void SD_Bus_Hold(SD_SPI_Handle *sd)
 { /* Select SD Card: set SD chip select pin low */
     HAL_GPIO_WritePin(sd->init.CS_Port, sd->init.CS_Pin, GPIO_PIN_RESET);
 }
 
-/**
- * @brief  Release SPI bus used by SD card
- * @param  None
- * @retval None
- */
-static void SD_Bus_Release(SD_SPI_Handle *sd)
+void SD_Bus_Release(SD_SPI_Handle *sd)
 { /* Deselect SD Card: set SD chip select pin high */
     HAL_GPIO_WritePin(sd->init.CS_Port, sd->init.CS_Pin, GPIO_PIN_SET);
     SD_ReadByte(sd); /* send dummy byte: 8 Clock pulses of delay */
@@ -338,25 +331,19 @@ static SD_Error SD_ReceiveData(SD_SPI_Handle *sd, uint8_t *data, uint16_t len)
     /* some cards need time before transmitting the data... */
     b = SD_WaitBytesRead(sd);
 
-    if (b != 0xFF)
-    { /* most cards send transmission start token, don't fail if it's not the case... */
-        data[i] = b;
-        if (data[i] == SD_DATA_BLOCK_READ_START) /* 0xFE */
-            data[i] = SD_ReadByte(sd); /* just get the next byte... */
+    if (b != SD_DATA_BLOCK_READ_START)
+        return SD_RESPONSE_FAILURE;
 
-        /* receive the rest of data... */
-        for (i = 1; i < len; ++i)
-            data[i] = SD_ReadByte(sd);
+    for (i = 0; i < len; ++i)
+        data[i] = SD_ReadByte(sd);
 
-        /* get CRC bytes (not really needed by us, but required by SD) */
-        SD_ReadByte(sd);
-        SD_ReadByte(sd);
+    /* CRC Reading */
+    SD_ReadByte(sd);
+    SD_ReadByte(sd);
 
-        return SD_RESPONSE_NO_ERROR;
-    }
-    return SD_RESPONSE_FAILURE;
+    return SD_RESPONSE_NO_ERROR;
+
 }
-
 
 SD_Error SD_GetCSDRegister(SD_SPI_Handle *sd, SD_CSD *SD_csd)
 {
@@ -487,7 +474,7 @@ SD_Error SD_GetSCRRegister(SD_SPI_Handle *sd, SD_SCR *SD_scr)
     /* request SCR register (send ACMD51)... */
     state = SD_SendCmd(sd, SD_CMD_SEND_APP, 0x00000000, 0x65);
     if (state == SD_RESPONSE_NO_ERROR)
-        state = SD_SendCmd(sd, SD_CMD_SEND_SCR, 0x00000000, 0xFF);
+        state = SD_SendCmd(sd, SD_ACMD_SEND_SCR, 0x00000000, 0xFF);
     if (state != SD_RESPONSE_NO_ERROR)
         return SD_RESPONSE_FAILURE;
     state = SD_ReceiveData(sd, SCR_Tab, 8); /* receive SCR register data */
@@ -522,22 +509,45 @@ static SD_InitResult SD_GoIdleState(SD_SPI_Handle *sd)
     uint8_t state;
     uint32_t start_time;
 
-    /* --- put SD card in SPI mode */
     SD_Bus_Hold(sd);
 
+    state = SD_WaitReady(sd);
+
     /* Software reset */
-    state = SD_SendCmd(sd, 0, 0x00000000, 0x95); // valid CRC is mandatory here
+    uint8_t ready_check_counter = 16;
+    start_time = HAL_GetTick();
+    do
+    {
+        state = SD_SendCmd(sd, SD_CMD_GO_IDLE_STATE, 0x00000000, 0x95);          // valid CRC is mandatory here
+        if (state == 0x00 && --ready_check_counter == 0)
+        {
+            /* Check OCR */
+            /* request OCR register (send CMD58)... */
+            state = SD_SendCmd(sd, SD_CMD_READ_OCR, 0x00000000, 0xFF);
+            if (state == SD_RESPONSE_NO_ERROR)
+            { /* get OCR register (R3 response) and check its CCS (bit 30) */
+                SD_GetResponse4b(sd, (uint8_t*) &res);
+                sd->card_type = (res & 0x40000000) ? SD_Card_SDHC : SD_Card_SDSC_v2;
+            }
+            else
+                sd->card_type = SD_Card_SDSC_v2;
+
+            return SD_INIT_SUCESS;
+        }
+
+    } while (state != SD_IN_IDLE_STATE && (HAL_GetTick() - start_time) <= 1000);
+
     if (state != SD_IN_IDLE_STATE)
         return SD_INIT_NO_CARD;
 
-    SD_WaitReady(sd);
+    state = SD_WaitReady(sd);
 
     /* Voltage check*/
-    state = SD_SendCmd(sd, 8, 0x000001AA, 0x87); // valid CRC is mandatory here
-    if (state == SD_IN_IDLE_STATE) // SDv2
+    state = SD_SendCmd(sd, SD_CMD_SEND_IF_COND, 0x000001AA, 0x87);          // valid CRC is mandatory here
+    if (state == SD_IN_IDLE_STATE)          // SDv2
     {
         SD_GetResponse4b(sd, (uint8_t*) &res);
-        if (res != 0x01AA)
+        if ((res & 0xFFF) != 0x01AA)
             return SD_INIT_VOLTAGE_ERROR;
 
         SD_WaitReady(sd);
@@ -550,7 +560,7 @@ static SD_InitResult SD_GoIdleState(SD_SPI_Handle *sd)
             if (state != SD_IN_IDLE_STATE)
                 continue;
 
-            state = SD_SendCmd(sd, SD_CMD_ACTIVATE_INIT, 0x40000000, 0xFF);
+            state = SD_SendCmd(sd, SD_ACMD_ACTIVATE_INIT, 0x40000000, 0xFF);
             SD_GetResponse4b(sd, (uint8_t*) &res);
 
             SD_WaitReady(sd);
@@ -560,7 +570,6 @@ static SD_InitResult SD_GoIdleState(SD_SPI_Handle *sd)
             return SD_INIT_APP_INIT_FAILED;
 
         /* Check OCR */
-
         /* request OCR register (send CMD58)... */
         state = SD_SendCmd(sd, SD_CMD_READ_OCR, 0x00000000, 0xFF);
         if (state == SD_RESPONSE_NO_ERROR)
@@ -571,7 +580,7 @@ static SD_InitResult SD_GoIdleState(SD_SPI_Handle *sd)
         else
             sd->card_type = SD_Card_SDSC_v2;
     }
-    else // SDv1
+    else          // SDv1
     {
         sd->card_type = SD_Card_SDSC_v1;
 
@@ -583,7 +592,7 @@ static SD_InitResult SD_GoIdleState(SD_SPI_Handle *sd)
             if (state != SD_IN_IDLE_STATE)
                 continue;
 
-            state = SD_SendCmd(sd, SD_CMD_ACTIVATE_INIT, 0x00000000, 0xFF);
+            state = SD_SendCmd(sd, SD_ACMD_ACTIVATE_INIT, 0x00000000, 0xFF);
 
             SD_GetResponse4b(sd, (uint8_t*) &res);
 
@@ -601,6 +610,7 @@ static SD_InitResult SD_GoIdleState(SD_SPI_Handle *sd)
 
         if ((state & SD_IN_IDLE_STATE) != 0x00)
             return SD_INIT_UNKNOW_CARD;
+
     }
 
     state = SD_WaitReady(sd);
@@ -696,7 +706,12 @@ SD_Error SD_SectorRead(SD_SPI_Handle *sd, uint32_t readAddr, uint8_t *pBuffer)
 
     /* receive data if command acknowledged... */
     if (state == SD_RESPONSE_NO_ERROR)
+    {
+        /* read the block */
         state = SD_ReceiveData(sd, pBuffer, SD_BLOCK_SIZE);
+    }
+
+    state = SD_WaitReady(sd);
 
     SD_Bus_Release(sd); /* release SPI bus... */
 
@@ -707,7 +722,6 @@ SD_Error SD_SectorWrite(SD_SPI_Handle *sd, uint32_t writeAddr, const uint8_t *pB
 {
     SD_Error state;
     SD_DataResponse res;
-    uint16_t BlockSize = SD_BLOCK_SIZE;
 
     /* non High Capacity cards use byte-oriented addresses */
     if (sd->card_type != SD_Card_SDHC)
