@@ -21,9 +21,14 @@
 #include "sd_spi_driver.h"
 #include "num_keyboard_driver.h"
 
+/* Other */
+#include "snake.h"
+
 LCD_Handle hlcd;
 SD_SPI_Handle hsd;
 NKB_Handle hnkb;
+
+SnakeGameState snakeGS;
 
 uint8_t MAX_LINE_CHAR;
 uint8_t MAX_ROW_CHAR;
@@ -148,6 +153,10 @@ void Init(void)
     //hlcd.Clear(&hlcd);
     hlcd.PrintString(&hlcd, 0, ROW12, "Init finished", 1, WHITE, hlcd.Init.bg_color);
     //MemTest(0x400);
+
+    snakeGS.Init.lcd_handle = &hlcd;
+    snakeGS.Init.nkb_handle = &hnkb;
+    InitSnake(&snakeGS);
 }
 
 static uint16_t FPS;
@@ -191,13 +200,24 @@ void Loop(uint32_t ticks)
 
     NKB_Update(&hnkb);
 
+    if (NKB_IsKeyPressed(snakeGS.Init.nkb_handle, NKB_KEY_7))
+        snakeGS.dir = 1;
+    else if (NKB_IsKeyPressed(snakeGS.Init.nkb_handle, NKB_KEY_8))
+        snakeGS.dir = 3;
+    else if (NKB_IsKeyPressed(snakeGS.Init.nkb_handle, NKB_KEY_0))
+        snakeGS.dir = 0;
+    else if (NKB_IsKeyPressed(snakeGS.Init.nkb_handle, NKB_KEY_5))
+        snakeGS.dir = 2;
+
     if (tick_flag >= 100)
     {
 
-        tim_count += tick_flag;
+        //tim_count += tick_flag;
         tick_flag = 0;
-        hlcd.PrintString(&hlcd, 0, ROW5, "Timer interrupt", 1, MAROON1, hlcd.Init.bg_color);
-        hlcd.PrintNumber(&hlcd, 0, ROW6, tim_count, 0, 1, MAROON2, hlcd.Init.bg_color);
+        //hlcd.PrintString(&hlcd, 0, ROW5, "Timer interrupt", 1, MAROON1, hlcd.Init.bg_color);
+        //hlcd.PrintNumber(&hlcd, 0, ROW6, tim_count, 0, 1, MAROON2, hlcd.Init.bg_color);
+
+        UpdateSnake(&snakeGS);
     }
 
     /*for (int i = 0; i < NKB_NUM_KEYS; ++i)
