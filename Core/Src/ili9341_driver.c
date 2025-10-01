@@ -68,6 +68,8 @@ void ili9341_init(LCD_Handle *LcdHandle)
     LcdHandle->PrintChar = ili9341_putchar;
     LcdHandle->PrintString = ili9341_putstring;
     LcdHandle->PrintNumber = ili9341_putnumber;
+    LcdHandle->DrawPixel = ili9341_draw_pixel;
+    LcdHandle->SetDrawPos = ili9341_set_xy;
 
     ili9341_reset(LcdHandle);
 

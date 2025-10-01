@@ -40,6 +40,8 @@ typedef struct __LCD_Handle
     void (*Clear)(struct __LCD_Handle *LcdHandle);
     void (*DrawPixelAt)(struct __LCD_Handle *LcdHandle, int x, int y,
             uint16_t color);
+    void (*SetDrawPos)(struct __LCD_Handle *LcdHandle, int x, int y);
+    void (*DrawPixel)(struct __LCD_Handle *LcdHandle, uint16_t color); // Go automaticaly to next pos
 
     void (*PrintChar)(struct __LCD_Handle *LcdHandle, int x, int y, int c,
             int size, int fcolor, int bcolor);
